@@ -9,6 +9,7 @@ class DigitalSignature implements IterationFunction, Encryptionable {
     private static final BigInteger p = new BigInteger("AF5228967057FE1CB84B92511BE89A47", 16);
     private static final BigInteger q = new BigInteger("57A9144B382BFF0E5C25C9288DF44D23", 16);
     private static final BigInteger a = new BigInteger("9E93A4096E5416CED0242228014B67B5", 16);
+    private static final BigInteger CONST = new BigInteger("FFFFFFFF", 16);
     private static final int[] table = {
             0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
             0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
@@ -44,20 +45,32 @@ class DigitalSignature implements IterationFunction, Encryptionable {
     }
 
     public BigInteger encrypt(BigInteger M, BigInteger key) {
+        StringBuilder s = new StringBuilder(key.toString(2));
+        while (s.length() < 64) {
+            s.insert(0 ,0);
+        }
+        BigInteger[] k = new BigInteger[4];
+        k[0] = new BigInteger(s.substring(0, 32), 2);
+        k[1] = new BigInteger(s.substring(32, 64), 2);
+        k[2] = CONST.subtract(k[0]);
+        k[3] = CONST.subtract(k[1]);
+
         BigInteger L0 = new BigInteger(M.toString(2).substring(0, 32), 2);
         BigInteger R0 = new BigInteger(M.toString(2).substring(32, 64), 2);
-        BigInteger R, L;
+        BigInteger L;
+
         for (int i = 0; i < 4; ++i) {
-            R = new BigInteger(R0.toString());
             L = new BigInteger(L0.toString());
-//            L0 = F(key)
-
-
+            L0 = F(k[i], R0).xor(L);
+            R0 = L;
         }
-        return null;
+
+        s = new StringBuilder(R0.toString(2));
+        s.append(L0.toString(2));
+        return new BigInteger(s.toString(), 2);
     }
 
-    BigInteger F(BigInteger K, BigInteger R) {
+    private BigInteger F(BigInteger K, BigInteger R) {
         BigInteger X = K.xor(R);
         StringBuilder temp = new StringBuilder(X.toString(2));
         while (temp.length() < 32) {
@@ -67,14 +80,19 @@ class DigitalSignature implements IterationFunction, Encryptionable {
         for (int i = 0; i < 4; ++i) {
             result.append(Integer.toHexString(table[Integer.parseInt(temp.substring(i * 8, (i + 1) * 8), 2)]));
         }
-        int s = Integer.parseInt(result.toString(), 16);
-        s = Integer.rotateLeft(s, 13);
+        BigInteger t = new BigInteger(result.toString(), 16);
+        result = new StringBuilder(t.toString(2));
+        while (result.length() < 32) {
+            result.insert(0 ,0);
+        }
+        return new BigInteger(result.substring(13, result.length()) + result.substring(0, 13), 2);
 
-        return X;
+//        int s = Integer.parseInt(result.toString(), 16);
+        /*
+        System.out.println(s.substring(13, s.length()) + s.substring(0, 13));*/
+//        s = Integer.rotateLeft(s, 13);
+//        return new BigInteger(Integer.toString(s, 16), 16);
     }
-
-
-
 
     private BigInteger hash(String M) {
         StringBuilder temp = new StringBuilder(M);
@@ -97,6 +115,7 @@ class DigitalSignature implements IterationFunction, Encryptionable {
             BigInteger M = new BigInteger(reader.readLine(), 16);
             reader.close();
             M = hash(M.toString(2));
+            System.out.println(M.toString(16));
 
 //            System.out.println("**********************");
 //            F(new BigInteger("15412343", 16), new BigInteger("234234", 16));
@@ -106,13 +125,15 @@ class DigitalSignature implements IterationFunction, Encryptionable {
 
             PrintWriter writer = new PrintWriter("data/result.txt");
             writer.write(inputFileName + '\n');
-            writer.write("H = " + '\n');
+            writer.write("H = " +'\n');
             writer.write("Y = " + y.toString(16) +'\n');
             writer.write("K = " + '\n');
             writer.write("S = " + '\n');
             writer.close();
         } catch (Exception e) {
+            System.out.println("Exception");
             System.out.println(e.getMessage());
+            e.printStackTrace();
         }
     }
 

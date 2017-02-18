@@ -1,5 +1,5 @@
 data/data.txt
 H = 
-Y = 1af04d359fcf555aaa493031822e1383
+Y = 4ee09c55144888a2b90f859c6ea2a701
 K = 
 S = 
