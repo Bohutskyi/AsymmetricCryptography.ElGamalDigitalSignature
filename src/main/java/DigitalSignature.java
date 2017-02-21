@@ -1,14 +1,9 @@
 import java.io.BufferedReader;
 import java.io.FileReader;
-import java.io.PrintWriter;
 import java.math.BigInteger;
-import java.util.Random;
 
-class DigitalSignature implements IterationFunction, Encryptionable {
+public class DigitalSignature implements Encryptionable, IterationFunction {
 
-    private static final BigInteger p = new BigInteger("AF5228967057FE1CB84B92511BE89A47", 16);
-    private static final BigInteger q = new BigInteger("57A9144B382BFF0E5C25C9288DF44D23", 16);
-    private static final BigInteger a = new BigInteger("9E93A4096E5416CED0242228014B67B5", 16);
     private static final BigInteger CONST = new BigInteger("FFFFFFFF", 16);
     private static final int[] table = {
             0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
@@ -28,113 +23,140 @@ class DigitalSignature implements IterationFunction, Encryptionable {
             0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf,
             0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16};
 
+
     private String inputFileName;
-    private BigInteger x, y;
 
     DigitalSignature(String inputFileName) {
         this.inputFileName = inputFileName;
-        Random random = new Random();
-        do {
-            x = new BigInteger(128, random);
-        } while (x.compareTo(p) == 1);
-        y = a.modPow(x, p);
-    }
-
-    public BigInteger iterationFunction(BigInteger M, BigInteger H) {
-        return encrypt(M.xor(H), H).xor(M).xor(H);
-    }
-
-    public BigInteger encrypt(BigInteger M, BigInteger key) {
-        StringBuilder s = new StringBuilder(key.toString(2));
-        while (s.length() < 64) {
-            s.insert(0 ,0);
-        }
-        BigInteger[] k = new BigInteger[4];
-        k[0] = new BigInteger(s.substring(0, 32), 2);
-        k[1] = new BigInteger(s.substring(32, 64), 2);
-        k[2] = CONST.subtract(k[0]);
-        k[3] = CONST.subtract(k[1]);
-
-        BigInteger L0 = new BigInteger(M.toString(2).substring(0, 32), 2);
-        BigInteger R0 = new BigInteger(M.toString(2).substring(32, 64), 2);
-        BigInteger L;
-
-        for (int i = 0; i < 4; ++i) {
-            L = new BigInteger(L0.toString());
-            L0 = F(k[i], R0).xor(L);
-            R0 = L;
-        }
-
-        s = new StringBuilder(R0.toString(2));
-        s.append(L0.toString(2));
-        return new BigInteger(s.toString(), 2);
-    }
-
-    private BigInteger F(BigInteger K, BigInteger R) {
-        BigInteger X = K.xor(R);
-        StringBuilder temp = new StringBuilder(X.toString(2));
-        while (temp.length() < 32) {
-            temp.insert(0 ,0);
-        }
-        StringBuilder result = new StringBuilder();
-        for (int i = 0; i < 4; ++i) {
-            result.append(Integer.toHexString(table[Integer.parseInt(temp.substring(i * 8, (i + 1) * 8), 2)]));
-        }
-        BigInteger t = new BigInteger(result.toString(), 16);
-        result = new StringBuilder(t.toString(2));
-        while (result.length() < 32) {
-            result.insert(0 ,0);
-        }
-        return new BigInteger(result.substring(13, result.length()) + result.substring(0, 13), 2);
-
-//        int s = Integer.parseInt(result.toString(), 16);
-        /*
-        System.out.println(s.substring(13, s.length()) + s.substring(0, 13));*/
-//        s = Integer.rotateLeft(s, 13);
-//        return new BigInteger(Integer.toString(s, 16), 16);
-    }
-
-    private BigInteger hash(String M) {
-        StringBuilder temp = new StringBuilder(M);
-        temp.append(1);
-        while (temp.length() % 64 != 0) {
-            temp.append(0);
-        }
-
-        BigInteger H = BigInteger.ZERO;
-        int size = temp.length() / 64;
-        for (int i = 0; i < size; ++i) {
-            H = iterationFunction(new BigInteger(temp.substring(i * 64, 64 * (i + 1)), 2), H);
-        }
-        return H;
     }
 
     void run() {
         try {
             BufferedReader reader = new BufferedReader(new FileReader(inputFileName));
-            BigInteger M = new BigInteger(reader.readLine(), 16);
+            String buffer = reader.readLine();
             reader.close();
-            M = hash(M.toString(2));
-            System.out.println(M.toString(16));
 
-//            System.out.println("**********************");
-//            F(new BigInteger("15412343", 16), new BigInteger("234234", 16));
-//            System.out.println("**********************");
+            int count = 0;
+            StringBuilder temp = new StringBuilder();
+            BigInteger H0 = BigInteger.ZERO;
+            for (int i = 0, n = buffer.length(); i < n; ++i) {
+                temp.append(((int) buffer.charAt(i) - 18));
+                count++;
+                if (count == 8) {
+                    count = 0;
+                    H0 = iterationFunction(new BigInteger(temp.toString(), 16), H0);
+                    temp = new StringBuilder();
+                }
+            }
+
+            temp.append(80);
+            while (temp.length() < 16) {
+                temp.append("00");
+            }
+            H0 = iterationFunction(new BigInteger(temp.toString(), 16), H0);
+            System.out.println("FINAL: " + H0.toString(16));
 
 
-
-            PrintWriter writer = new PrintWriter("data/result.txt");
-            writer.write(inputFileName + '\n');
-            writer.write("H = " +'\n');
-            writer.write("Y = " + y.toString(16) +'\n');
-            writer.write("K = " + '\n');
-            writer.write("S = " + '\n');
-            writer.close();
         } catch (Exception e) {
-            System.out.println("Exception");
             System.out.println(e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    public BigInteger iterationFunction(BigInteger input, BigInteger H) {
+        return encrypt(input.xor(H), H).xor(input).xor(H);
+    }
+
+
+    public BigInteger encrypt(BigInteger input, BigInteger key) {
+        StringBuilder temp;
+        BigInteger[] K = new BigInteger[4];
+
+        temp = new StringBuilder(key.toString(16));
+        while (temp.length() < 16) {
+            temp.insert(0, 0);
+        }
+        StringBuilder t1 = new StringBuilder(), t2 = new StringBuilder();
+        for (int i = 3; i>= 0; --i ) {
+            t1.append(temp.substring(i*2, 2*i + 2));
+            t2.append(temp.substring(i*2 + 8, 2*i + 10));
+        }
+
+        K[0] = new BigInteger(t1.toString(), 16);
+        K[1] = new BigInteger(t2.toString(), 16);
+        K[2] = CONST.subtract(K[1]);
+        K[3] = CONST.subtract(K[0]);
+
+        temp = new StringBuilder(input.toString(16));
+        while (temp.length() < 16) {
+            temp.insert(0, 0);
+        }
+        t1 = new StringBuilder();
+        t2 = new StringBuilder();
+        for (int i = 3; i >= 0; --i) {
+            t1.append(temp.substring(i*2, 2*i + 2));
+            t2.append(temp.substring(i*2 + 8, 2*i + 10));
+        }
+
+        BigInteger L0 = new BigInteger(t1.toString(), 16);
+        BigInteger R0 = new BigInteger(t2.toString(), 16);
+        BigInteger R;
+
+        for (int i = 0; i < 4; ++i) {
+            R = new BigInteger(L0.toString(16), 16);
+            L0 = F(K[i], R0).xor(R);
+            R0 = R;
+        }
+
+
+        temp = new StringBuilder(R0.toString(16));
+        while (temp.length() < 8) {
+            temp.insert(0, 0);
+        }
+        StringBuilder result = new StringBuilder();
+        for (int i = 3; i>= 0; --i) {
+            result.append(temp.substring(i * 2, (i + 1) * 2));
+        }
+        temp = new StringBuilder(L0.toString(16));
+        while (temp.length() < 8) {
+            temp.insert(0, 0);
+        }
+        for (int i = 3; i>= 0; --i) {
+            result.append(temp.substring(i * 2, (i + 1) * 2));
+        }
+
+        temp = new StringBuilder(input.toString(16));
+        while (temp.length() < 16) {
+            temp.insert(0, 0);
+        }
+
+        return new BigInteger(result.toString(), 16);
+    }
+
+    BigInteger F(BigInteger K, BigInteger R) {
+        BigInteger X = K.xor(R);
+        StringBuilder result = new StringBuilder();
+        StringBuilder temp = new StringBuilder(X.toString(16));
+        while (temp.length() < 8) {
+            temp.insert(0, 0);
+        }
+        for (int i = 3; i >= 0; --i) {
+            StringBuilder s = new StringBuilder();
+            s.append(Integer.toHexString(table[Integer.parseInt(temp.substring(i * 2, (i + 1) * 2), 16)]));
+            while (s.length() < 2) {
+                s.insert(0,0);
+            }
+            result.insert(0, s.toString());
+        }
+        BigInteger t = new BigInteger(result.toString(), 16);
+        result = new StringBuilder(t.toString(2));
+        while (result.length() % 32 != 0) {
+            result.insert(0, 0);
+        }
+
+        t = new BigInteger(result.substring(13, result.length()) + result.substring(0, 13), 2);
+
+        return t;
     }
 
 }
