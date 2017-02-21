@@ -1,8 +1,14 @@
 import java.io.BufferedReader;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.math.BigInteger;
+import java.util.Random;
 
-public class DigitalSignature implements Encryptionable, IterationFunction {
+public class DigitalSignature implements Encryptionable, IterationFunction, Signaturable {
+
+    private static final BigInteger p = new BigInteger("AF5228967057FE1CB84B92511BE89A47", 16);
+    private static final BigInteger q = new BigInteger("57A9144B382BFF0E5C25C9288DF44D23", 16);
+    private static final BigInteger a = new BigInteger("9E93A4096E5416CED0242228014B67B5", 16);
 
     private static final BigInteger CONST = new BigInteger("FFFFFFFF", 16);
     private static final int[] table = {
@@ -23,11 +29,17 @@ public class DigitalSignature implements Encryptionable, IterationFunction {
             0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf,
             0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16};
 
-
     private String inputFileName;
+    private  BigInteger x, y;
 
     DigitalSignature(String inputFileName) {
         this.inputFileName = inputFileName;
+        BigInteger temp;
+        do {
+            temp = new BigInteger(128, new Random());
+        } while (p.compareTo(temp) == -1);
+        this.x = temp;
+        this.y = a.modPow(x, p);
     }
 
     void run() {
@@ -56,11 +68,63 @@ public class DigitalSignature implements Encryptionable, IterationFunction {
             H0 = iterationFunction(new BigInteger(temp.toString(), 16), H0);
             System.out.println("FINAL: " + H0.toString(16));
 
+            temp = new StringBuilder(H0.toString(16));
+            while (temp.length() < 16) {
+                temp.insert(0, 0);
+            }
+            StringBuilder result = new StringBuilder();
+            for (int i = 7; i >= 0; --i) {
+                result.append(temp.substring(i * 2, 2 * (i + 1)));
+            }
+            result.insert(0, "00FFFFFFFFFFFF00");
+            BigInteger H = new BigInteger(result.toString(), 16);
 
+//            BigInteger U = new BigInteger(128, new Random());
+//            BigInteger Z = a.modPow(U, p);
+//            BigInteger[] sign = sign(H, U, Z);
+//            BigInteger S = a.modPow(sign[1], p);
+
+            x = new BigInteger("BC22994778F982450BFAEFDA0A40A328", 16);
+            y = a.modPow(x, p);
+            BigInteger U = new BigInteger("522E48FB8A5499EEEA04605F67D1ADBC", 16);
+            BigInteger Z = a.modPow(U, p);
+            BigInteger[] s = sign(H, U, Z);
+            BigInteger S = a.modPow(s[1], p);
+            System.out.println("H: " + H.toString(16));
+            System.out.println("X: " + x.toString(16));
+            System.out.println("Y: " + y.toString(16));
+            System.out.println("U: " + U.toString(16));
+            System.out.println("Z: " + Z.toString(16));
+            System.out.println("K: " + s[0].toString(16));
+            System.out.println("G: " + s[1].toString(16));
+            System.out.println("S: " + S.toString(16));
+
+
+//            FileWriter writer = new FileWriter("data/result.txt");
+//            writer.write(inputFileName + "\n");
+//            writer.write("H = " + H.toString(16).toUpperCase() + "\n");
+//            writer.write("Y = " + y.toString(16).toUpperCase() + "\n");
+//            writer.write("K = " + s[0].toString(16).toUpperCase() + "\n");
+//            writer.write("S = " + S.toString(16).toUpperCase() + "\n");
+//            writer.close();
         } catch (Exception e) {
             System.out.println(e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    public static boolean isCorrect(String inputFileName) {
+        try {
+            BufferedReader reader = new BufferedReader(new FileReader(inputFileName));
+            String buffer;
+
+
+
+            reader.close();
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
+        return false;
     }
 
     public BigInteger iterationFunction(BigInteger input, BigInteger H) {
@@ -157,6 +221,14 @@ public class DigitalSignature implements Encryptionable, IterationFunction {
         t = new BigInteger(result.substring(13, result.length()) + result.substring(0, 13), 2);
 
         return t;
+    }
+
+    public BigInteger[] sign(BigInteger H, BigInteger U, BigInteger Z) {
+        BigInteger[] result = new BigInteger[2];
+        System.out.println("u - z: " + U.subtract(Z).toString(16));
+        result[0] = (U.subtract(Z)).divide(x.add(H)).mod(q);
+        result[1] = (((x.multiply(Z)).add(U.multiply(H))).divide(x.add(H))).mod(q);
+        return result;
     }
 
 }
