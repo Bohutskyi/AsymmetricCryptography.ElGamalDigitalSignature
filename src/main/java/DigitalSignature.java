@@ -1,11 +1,11 @@
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.FileWriter;
+import java.io.*;
 import java.math.BigInteger;
+import java.nio.charset.Charset;
 import java.util.Random;
 
 public class DigitalSignature implements Encryptionable, IterationFunction, Signaturable {
 
+    private static final String INSERT = "------------------------------";
     private static final BigInteger p = new BigInteger("00AF5228967057FE1CB84B92511BE89A47", 16);
     private static final BigInteger q = new BigInteger("0057A9144B382BFF0E5C25C9288DF44D23", 16);
     private static final BigInteger a = new BigInteger("009E93A4096E5416CED0242228014B67B5", 16);
@@ -59,15 +59,25 @@ public class DigitalSignature implements Encryptionable, IterationFunction, Sign
 //            System.out.println("G: " + s[1].toString(16));
 //            System.out.println("S: " + S.toString(16));
 
-            FileWriter writer = new FileWriter(inputFileName + ".signed");
+            FileWriter writer = new FileWriter(inputFileName + ".sig");
+            writer.write(INSERT + "\n");
             writer.write(inputFileName + "\n");
             writer.write("H = " + H.toString(16).toUpperCase() + "\n");
             writer.write("Y = " + y.toString(16).toUpperCase() + "\n");
             writer.write("K = " + s[0].toString(16).toUpperCase() + "\n");
             writer.write("S = " + S.toString(16).toUpperCase() + "\n");
+            writer.write(INSERT);
+            writer.close();
+            writer = new FileWriter(inputFileName + ".sig.add");
+            writer.write(INSERT + "\n");
+            writer.write(inputFileName + "\n");
+            writer.write("U = " + U.toString(16) + "\n");
+            writer.write("Z = " + Z.toString(16) + "\n");
+            writer.write("G = " + s[1].toString(16) + "\n");
+            writer.write(INSERT);
             writer.close();
             System.out.println("Success");
-            System.out.println("Sign saved to " + inputFileName + ".signed");
+            System.out.println("Sign saved to " + inputFileName + ".sig");
         } catch (Exception e) {
             System.out.println(e.getMessage());
             e.printStackTrace();
@@ -120,22 +130,18 @@ public class DigitalSignature implements Encryptionable, IterationFunction, Sign
         return H;
     }
 
-    static boolean isCorrect(String inputFileName) {
+    static boolean isCorrect(String inputFileName, String signedFileName) {
+        BigInteger hash = new DigitalSignature(inputFileName).getHash();
         BigInteger H, Y, K, S, t;
         t = null;
         S = null;
-        String hashFileName = "";
         try {
-            BufferedReader reader = new BufferedReader(new FileReader(inputFileName));
+//            BufferedReader reader = new BufferedReader(new FileReader(inputFileName));
+            BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(signedFileName), "windows-1251"));
             String buffer;
             H = Y = K = S = null;
-            boolean first = false;
             while ((buffer = reader.readLine()) != null) {
                 String[] temp = buffer.split(" ");
-                if (!first) {
-                    hashFileName = buffer;
-                    first = true;
-                }
                 if (temp[0].equalsIgnoreCase("s")) {
                     S = new BigInteger(temp[2], 16);
                 } else if (temp[0].equalsIgnoreCase("k")) {
@@ -143,12 +149,15 @@ public class DigitalSignature implements Encryptionable, IterationFunction, Sign
                 } else if (temp[0].equalsIgnoreCase("y")) {
                     Y = new BigInteger(temp[2], 16);
                 }
-//                else if (temp[0].equalsIgnoreCase("h")) {
-//                    H = new BigInteger(temp[2], 16);
-//                }
+                else if (temp[0].equalsIgnoreCase("h")) {
+                    H = new BigInteger(temp[2], 16);
+                }
             }
             reader.close();
-            H = new DigitalSignature(hashFileName).getHash();
+            if (hash.compareTo(H) != 0) {
+                return false;
+            }
+//            H = new DigitalSignature(hashFileName).getHash();
 //            System.out.println(hash.toString(16));
             t = Y.modPow(K, p);
             t = t.multiply(S);
